@@ -1,0 +1,12 @@
+# ВАЖНО: эти два файла содержат личные ключи Spotify (client_secret и токены).
+# Никогда не коммитить и никому не отправлять.
+tokens.json
+obs-overlay.html
+
+# Служебное
+__pycache__/
+*.pyc
+*.bak
+*.log
+Thumbs.db
+.DS_Store

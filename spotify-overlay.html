@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Spotify Overlay</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:transparent; display:flex; align-items:flex-end; justify-content:flex-start; min-height:100vh; padding:24px; font-family:'DM Sans',sans-serif; }
+  #overlay { display:none; width:340px; background:rgba(10,10,12,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:14px; gap:12px; flex-direction:column; animation:slideIn 0.4s cubic-bezier(0.16,1,0.3,1); box-shadow:0 8px 40px rgba(0,0,0,0.5); }
+  #overlay.visible { display:flex; }
+  @keyframes slideIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  .top-row { display:flex; align-items:center; gap:12px; }
+  .cover-wrap { position:relative; flex-shrink:0; }
+  #cover { width:56px; height:56px; border-radius:8px; object-fit:cover; display:block; transition:opacity 0.3s; }
+  .vinyl-ring { position:absolute; inset:-3px; border-radius:11px; border:1.5px solid rgba(30,215,96,0.4); pointer-events:none; animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4;transform:scale(1)} 50%{opacity:0.9;transform:scale(1.03)} }
+  .track-info { flex:1; min-width:0; overflow:hidden; }
+  .spotify-badge { display:none; }
+  #track-name { font-family:'Syne',sans-serif; font-weight:800; font-size:22px; color:#fff; white-space:nowrap; overflow:hidden; line-height:1.2; position:relative; }
+  #track-name.scrolling { overflow:visible; }
+  #track-name .scroll-inner { display:inline-block; white-space:nowrap; will-change:transform; }
+  #artist-name { font-size:14px; color:rgba(255,255,255,0.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px; font-weight:300; }
+  .progress-section { display:flex; flex-direction:column; gap:5px; }
+  .progress-bar-bg { width:100%; height:3px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden; }
+  #progress-fill { height:100%; background:linear-gradient(90deg,#1ED760,#1DB954); border-radius:2px; width:0%; transition:width 0.9s linear; }
+  .time-row { display:flex; justify-content:space-between; }
+  .time-row span { font-size:9px; color:rgba(255,255,255,0.3); font-weight:300; letter-spacing:0.04em; }
+  #config-screen { position:fixed; inset:0; background:#0d0d0f; display:flex; align-items:center; justify-content:center; z-index:100; }
+  .config-box { width:380px; padding:32px; background:#111113; border:1px solid rgba(255,255,255,0.08); border-radius:20px; }
+  .config-box h2 { font-family:'Syne',sans-serif; font-size:22px; color:#fff; margin-bottom:6px; font-weight:800; }
+  .config-box p { font-size:12px; color:rgba(255,255,255,0.4); margin-bottom:24px; line-height:1.5; }
+  .field { margin-bottom:14px; }
+  .field label { display:block; font-size:11px; color:rgba(255,255,255,0.5); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px; }
+  .field input { width:100%; padding:10px 14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:#fff; font-size:13px; font-family:'DM Sans',sans-serif; outline:none; transition:border-color 0.2s; }
+  .field input:focus { border-color:#1ED760; }
+  #auth-btn { width:100%; padding:12px; background:#1ED760; color:#000; font-family:'Syne',sans-serif; font-weight:700; font-size:14px; border:none; border-radius:10px; cursor:pointer; transition:background 0.2s; }
+  #auth-btn:hover { background:#1DB954; }
+  #status-msg { margin-top:12px; font-size:11px; color:rgba(255,255,255,0.3); text-align:center; min-height:16px; }
+</style>
+</head>
+<body>
+<div id="config-screen">
+  <div class="config-box">
+    <h2>Spotify Overlay</h2>
+    <p>Введи данные из своего Spotify Developer App и авторизуйся.</p>
+    <div class="field"><label>Client ID</label><input type="text" id="client-id" placeholder="Вставь Client ID"></div>
+    <div class="field"><label>Client Secret</label><input type="password" id="client-secret" placeholder="Вставь Client Secret"></div>
+    <button id="auth-btn" onclick="startAuth()">Авторизоваться через Spotify</button>
+    <div id="status-msg"></div>
+  </div>
+</div>
+<div id="overlay">
+  <div class="top-row">
+    <div class="cover-wrap">
+      <img id="cover" src="" alt="cover">
+      <div class="vinyl-ring"></div>
+    </div>
+    <div class="track-info">
+      <div class="spotify-badge">
+        <svg viewBox="0 0 24 24" fill="#1ED760"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        <span>Now Playing</span>
+      </div>
+      <div id="track-name">—</div>
+      <div id="artist-name">—</div>
+    </div>
+  </div>
+  <div class="progress-section">
+    <div class="progress-bar-bg"><div id="progress-fill"></div></div>
+    <div class="time-row"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
+  </div>
+</div>
+<script>
+  let accessToken = null, refreshToken = null, clientId = null, clientSecret = null;
+  let localProgress = 0, trackDuration = 0, progressTick = null, lastTrackId = null;
+  let pollTick = null;
+
+  const $ = id => document.getElementById(id);
+  const fmtTime = ms => { const s=Math.floor(ms/1000); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; };
+  function setStatus(msg) { $('status-msg').textContent = msg; }
+
+  async function startAuth() {
+    clientId = $('client-id').value.trim();
+    clientSecret = $('client-secret').value.trim();
+    if (!clientId || !clientSecret) { setStatus('⚠️ Введи Client ID и Client Secret'); return; }
+    await fetch(`http://127.0.0.1:8888/save-creds?client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}`);
+    const params = new URLSearchParams({
+      response_type:'code', client_id:clientId,
+      scope:'user-read-currently-playing user-read-playback-state',
+      redirect_uri:'http://127.0.0.1:8888'
+    });
+    location.href = 'https://accounts.spotify.com/authorize?' + params;
+  }
+
+  async function doRefresh() {
+    if (!refreshToken || !clientId || !clientSecret) return false;
+    const creds = btoa(clientId+':'+clientSecret);
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded','Authorization':'Basic '+creds},
+      body: new URLSearchParams({grant_type:'refresh_token',refresh_token:refreshToken})
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      accessToken = data.access_token;
+      if (data.refresh_token) refreshToken = data.refresh_token;
+      try { await fetch(`http://127.0.0.1:8888/save-token?access_token=${encodeURIComponent(accessToken)}&refresh_token=${encodeURIComponent(refreshToken||'')}`); } catch(e){}
+      return true;
+    }
+    return false;
+  }
+
+  function showOverlay() {
+    $('config-screen').style.display = 'none';
+    $('overlay').classList.add('visible');
+    fetchNowPlaying();
+    if (!pollTick) pollTick = setInterval(fetchNowPlaying, 5000);
+  }
+
+  function onAuthFailed() {
+    clearInterval(pollTick); pollTick = null;
+    clearInterval(progressTick);
+    $('overlay').classList.remove('visible');
+    if (location.protocol === 'http:' || location.protocol === 'https:') {
+      $('config-screen').style.display = 'flex';
+      setStatus('Доступ к Spotify истёк — авторизуйся заново');
+    } else {
+      console.warn('Spotify: токен недействителен. Запусти start-overlay.bat и авторизуйся заново.');
+    }
+  }
+
+  async function fetchNowPlaying() {
+    try {
+      let res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+        headers:{'Authorization':'Bearer '+accessToken}
+      });
+      if (res.status === 401) {
+        const ok = await doRefresh();
+        if (!ok) { onAuthFailed(); return; }
+        res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+          headers:{'Authorization':'Bearer '+accessToken}
+        });
+      }
+      if (res.status === 204) { $('overlay').classList.remove('visible'); return; }
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data || !data.item) { $('overlay').classList.remove('visible'); return; }
+      $('overlay').classList.add('visible');
+      updateUI(data);
+    } catch(e) { console.error(e); }
+  }
+
+  let marqueeAnim = null;
+  let currentMarqueeText = null;
+
+  function setupMarquee(el, text) {
+    // Don't rebuild if text hasn't changed — avoids resetting the animation
+    if (currentMarqueeText === text) return;
+    currentMarqueeText = text;
+
+    const container = el;
+    if (marqueeAnim) { marqueeAnim.cancel(); marqueeAnim = null; }
+    container.classList.remove('scrolling');
+    container.innerHTML = '';
+    container.textContent = text;
+
+    // Wait for fonts to load before measuring
+    document.fonts.ready.then(() => {
+      requestAnimationFrame(() => {
+        const containerWidth = container.parentElement.clientWidth;
+        if (container.scrollWidth > containerWidth) {
+          container.textContent = '';
+          container.classList.add('scrolling');
+          const gapPx = 60;
+          // Measure exact text width with font loaded
+          const measure = document.createElement('span');
+          measure.style.cssText = 'display:inline-block;white-space:nowrap;visibility:hidden;position:absolute;font:inherit;';
+          measure.textContent = text;
+          container.appendChild(measure);
+          const textWidth = measure.offsetWidth;
+          container.removeChild(measure);
+          const blockWidth = textWidth + gapPx;
+          // Two identical copies: [text1][gap][text2][gap]
+          const inner = document.createElement('span');
+          inner.className = 'scroll-inner';
+          inner.innerHTML = `<span style="display:inline-block">${text}</span><span style="display:inline-block;width:${gapPx}px"></span><span style="display:inline-block">${text}</span><span style="display:inline-block;width:${gapPx}px"></span>`;
+          container.appendChild(inner);
+          // Animate: scroll exactly one [text+gap] block, then loop seamlessly
+          const speed = 40; // px per second
+          const durationMs = (blockWidth / speed) * 1000;
+          marqueeAnim = inner.animate(
+            [
+              { transform: 'translateX(0px)' },
+              { transform: `translateX(-${blockWidth}px)` }
+            ],
+            { duration: durationMs, iterations: Infinity, easing: 'linear' }
+          );
+        }
+      });
+    });
+  }
+
+  function updateUI(data) {
+    const track = data.item;
+    const imgUrl = track.album.images[1]?.url || track.album.images[0]?.url;
+    if (track.id !== lastTrackId) {
+      lastTrackId = track.id;
+      const img = $('cover'); img.style.opacity='0'; img.src=imgUrl;
+      img.onload = () => img.style.opacity='1';
+      // Only rebuild marquee and artist on track change
+      setupMarquee($('track-name'), track.name);
+      $('artist-name').textContent = track.artists.map(a=>a.name).join(', ');
+    }
+    localProgress = data.progress_ms; trackDuration = track.duration_ms;
+    $('time-total').textContent = fmtTime(trackDuration);
+    renderProgress();
+    clearInterval(progressTick);
+    if (data.is_playing) {
+      progressTick = setInterval(() => {
+        localProgress = Math.min(localProgress+1000, trackDuration);
+        renderProgress();
+      }, 1000);
+    }
+  }
+
+  function renderProgress() {
+    $('progress-fill').style.width = (trackDuration>0 ? localProgress/trackDuration*100 : 0)+'%';
+    $('time-current').textContent = fmtTime(localProgress);
+  }
+
+  async function init() {
+    // Use injected tokens if available (OBS mode)
+    if (window._SPOTIFY_TOKENS && window._SPOTIFY_TOKENS.access_token) {
+      const t = window._SPOTIFY_TOKENS;
+      accessToken = t.access_token;
+      refreshToken = t.refresh_token;
+      clientId = t.client_id;
+      clientSecret = t.client_secret;
+      showOverlay();
+      return;
+    }
+    // Try loading from server
+    try {
+      const res = await fetch('http://127.0.0.1:8888/tokens');
+      const tokens = await res.json();
+      clientId = tokens.client_id || '';
+      clientSecret = tokens.client_secret || '';
+      accessToken = tokens.access_token || '';
+      refreshToken = tokens.refresh_token || '';
+      if (clientId) $('client-id').value = clientId;
+      if (clientSecret) $('client-secret').value = clientSecret;
+      if (accessToken && clientId && clientSecret) { showOverlay(); return; }
+      if (refreshToken && clientId && clientSecret) {
+        const ok = await doRefresh();
+        if (ok) { showOverlay(); return; }
+      }
+    } catch(e) {}
+    setStatus('');
+  }
+
+  init();
+</script>
+</body>
+</html>
